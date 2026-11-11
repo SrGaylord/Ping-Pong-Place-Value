@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ping Pong Place Value</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: row;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+        }
+        #main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            height: 100%;
+        }
+        #canvas-wrapper {
+            flex: 1;
+            position: relative;
+            background: #090d16;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 30%, #1e293b 0%, #090d16 100%);
+        }
+        /* Sidebar styling */
+        #scoreboard-sidebar {
+            width: 280px;
+            background: #1e293b;
+            border-left: 2px solid #334155;
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+        }
+        @media (max-width: 768px) {
+            #game-container {
+                flex-direction: column;
+            }
+            #scoreboard-sidebar {
+                width: 100%;
+                height: 140px;
+                border-left: none;
+                border-top: 2px solid #334155;
+            }
+        }
+        .btn-action {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            transition: all 0.2s ease;
+        }
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+        }
+        .btn-action:active {
+            transform: translateY(1px);
+        }
+        .backdrop-blur-custom {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .color-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.15s ease;
+        }
+        .color-swatch:hover {
+            transform: scale(1.15);
+        }
+        .color-swatch.selected {
+            border-color: #ffffff;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Main Interactive Area -->
+    <div id="main-area">
+        <!-- Header Navigation & Live Scores -->
+        <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex justify-between items-center z-10 shadow-lg select-none">
+            <div class="flex items-center space-x-3">
+                <div id="p1-header-card" class="bg-blue-900/60 border border-blue-500/30 px-3 py-1.5 rounded-xl text-center">
+                    <span id="p1-header-name" class="text-xs text-blue-300 font-semibold uppercase tracking-wider block truncate max-w-[100px]">Player 1</span>
+                    <span id="p1-score" class="text-lg font-extrabold text-blue-400">0.000</span>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <div id="round-indicator" class="text-base font-bold text-amber-400">Round 1A</div>
+                <div id="receiver-indicator" class="text-xs font-medium text-slate-400">P1 collects score</div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div id="p2-header-card" class="bg-purple-900/60 border border-purple-500/30 px-3 py-1.5 rounded-xl text-center">
+                    <span id="p2-header-name" class="text-xs text-purple-300 font-semibold uppercase tracking-wider block truncate max-w-[100px]">Player 2</span>
+                    <span id="p2-score" class="text-lg font-extrabold text-purple-400">0.000</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Canvas Wrapper -->
+        <div id="canvas-wrapper">
+            <!-- Floating HUD Overlay -->
+            <div id="ui-overlay" class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center space-x-3 bg-slate-900/90 border border-slate-700/80 px-4 py-2 rounded-2xl shadow-xl pointer-events-none z-10 transition-all">
+                <div class="flex items-center space-x-2">
+                    <span id="thrower-badge" class="px-2 py-0.5 rounded-md text-xs font-bold bg-blue-500 text-white">P2 Throwing</span>
+                    <span class="text-slate-300 text-xs sm:text-sm font-semibold">Ball:</span>
+                    <span id="current-ball-val" class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black text-base shadow">?</span>
+                </div>
+                <div class="h-4 w-px bg-slate-700"></div>
+                <div id="saved-misses-container" class="text-xs text-emerald-400 font-medium flex items-center space-x-1">
+                    <span>Extra Balls:</span>
+                    <span id="saved-misses-count" class="font-bold text-sm text-emerald-300">0</span>
+                </div>
+            </div>
+
+            <!-- Canvas Element -->
+            <canvas id="gameCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- Persistent Side Scoreboard -->
+    <div id="scoreboard-sidebar">
+        <div class="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Round History</h3>
+            <span id="mode-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-semibold border border-slate-700">PvP</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3 space-y-2 text-xs" id="history-list">
+            <!-- Populated via JS -->
+        </div>
+        <div class="p-3 bg-slate-900 border-t border-slate-800 text-xs space-y-1">
+            <div class="flex justify-between text-slate-400 font-semibold">
+                <span>Total Score</span>
+            </div>
+            <div class="flex justify-between font-bold">
+                <span id="sb-p1-name" class="text-blue-400 truncate max-w-[120px]">P1</span>
+                <span id="sb-p1-total" class="text-blue-300">0.000</span>
+            </div>
+            <div class="flex justify-between font-bold">
+                <span id="sb-p2-name" class="text-purple-400 truncate max-w-[120px]">P2</span>
+                <span id="sb-p2-total" class="text-purple-300">0.000</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Game Dialog & Settings Modal -->
+<div id="modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-custom flex items-center justify-center z-50 p-4 transition-opacity">
+    <div class="bg-slate-900 border-2 border-slate-700 p-6 rounded-3xl max-w-lg w-full text-center shadow-2xl relative overflow-hidden" id="modal-content">
+        <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-amber-300 to-purple-400 mb-1">Ping Pong Place Value</h1>
+        <p class="text-slate-400 text-xs mb-4">Master place value values in a tactical 3-round toss challenge!</p>
+        
+        <div id="setup-form" class="space-y-4 text-left text-xs mb-4">
+            <!-- Mode Selection -->
+            <div>
+                <label class="block font-bold text-slate-300 mb-1">Game Mode</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" id="mode-pvp-btn" class="py-2 px-3 rounded-xl border border-blue-500/80 bg-blue-900/30 text-white font-bold text-center" onclick="setGameMode('pvp')">Player vs Player</button>
+                    <button type="button" id="mode-ai-btn" class="py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-400 font-bold text-center" onclick="setGameMode('ai')">Player vs AI</button>
+                </div>
+            </div>
+
+            <!-- AI Difficulty (Hidden if PvP) -->
+            <div id="ai-difficulty-box" class="hidden">
+                <label class="block font-bold text-slate-300 mb-1">AI Difficulty</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-semibold text-center" data-diff="easy" onclick="setAIDifficulty('easy')">Easy</button>
+                    <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-amber-500/80 bg-amber-950/40 text-amber-300 font-semibold text-center" data-diff="medium" onclick="setAIDifficulty('medium')">Medium</button>
+                    <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-semibold text-center" data-diff="hard" onclick="setAIDifficulty('hard')">Hard</button>
+                </div>
+            </div>
+
+            <!-- Player Setup Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- P1 Options -->
+                <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                    <label class="block font-bold text-blue-400">Player 1</label>
+                    <input type="text" id="p1-name-input" value="Player 1" maxlength="12" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-medium focus:outline-none focus:border-blue-500">
+                    <div>
+                        <span class="block text-[10px] text-slate-400 mb-1">Color</span>
+                        <div class="flex space-x-1.5" id="p1-color-picker"></div>
+                    </div>
+                </div>
+
+                <!-- P2 / AI Options -->
+                <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                    <label id="p2-label" class="block font-bold text-purple-400">Player 2</label>
+                    <input type="text" id="p2-name-input" value="Player 2" maxlength="12" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-medium focus:outline-none focus:border-purple-500">
+                    <div>
+                        <span class="block text-[10px] text-slate-400 mb-1">Color</span>
+                        <div class="flex space-x-1.5" id="p2-color-picker"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-action w-full py-3 px-6 text-white font-bold text-base rounded-2xl" onclick="startGame()">Start Game</button>
+    </div>
+</div>
+
+<script>
+    // Canvas & Graphics Context setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Preset Palette Options
+    const COLOR_PALETTE = [
+        { hex: "#3b82f6", name: "Blue" },
+        { hex: "#a855f7", name: "Purple" },
+        { hex: "#ef4444", name: "Red" },
+        { hex: "#10b981", name: "Green" },
+        { hex: "#f59e0b", name: "Amber" },
+        { hex: "#ec4899", name: "Pink" }
+    ];
+
+    // Player Configuration
+    let players = {
+        1: { name: "Player 1", color: "#3b82f6", score: 0 },
+        2: { name: "Player 2", color: "#a855f7", score: 0 }
+    };
+
+    let gameMode = 'pvp'; // 'pvp' or 'ai'
+    let aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+
+    // Basket types definition with values and distinct theme colors
+    const BASKET_TYPES = [
+        { label: "Hundreds", val: 100, short: "100s", color: "#ef4444" },
+        { label: "Tens", val: 10, short: "10s", color: "#f97316" },
+        { label: "Ones", val: 1, short: "1s", color: "#eab308" },
+        { label: "Tenths", val: 0.1, short: "0.1s", color: "#22c55e" },
+        { label: "Hundredths", val: 0.01, short: "0.01s", color: "#06b6d4" },
+        { label: "Thousandths", val: 0.001, short: "0.001s", color: "#a855f7" }
+    ];
+
+    // Game state tracking
+    let currentRoundIndex = 0;
+    const rounds = [
+        { name: "1A", receiver: 1 },
+        { name: "1B", receiver: 2 },
+        { name: "2A", receiver: 1 },
+        { name: "2B", receiver: 2 },
+        { name: "3A", receiver: 1 },
+        { name: "3B", receiver: 2 }
+    ];
+
+    let roundHistory = []; // Tracks scores per round for sidebar
+
+    let baskets = [];
+    let mainBallsPool = [];
+    let receiverExtraPool = [];
+    let isExtraPhase = false;
+    let currentBallValue = null;
+    let currentThrower = 1; // 1 or 2
+
+    // Game Flow States: 'AIMING', 'FLYING', 'AI_THINKING', 'ROUND_END_ANIM', 'ROUND_CALC_MODAL', 'GAME_OVER'
+    let gameState = 'AIMING';
+    
+    // Physics and aiming variables
+    let ballPos = { x: 0, y: 0 };
+    let ballVel = { x: 0, y: 0 };
+    let ballRadius = 18;
+    let dragStart = null;
+    let dragCurrent = null;
+    let activePointerId = null;
+
+    // Sorting animation variables
+    let animProgress = 0;
+    let animStartBaskets = [];
+    let animTargetBaskets = [];
+    let roundCalculatedSum = 0;
+    let roundCalcBreakdown = [];
+
+    // Initialize Color Picker Swatches in Start Menu Modal
+    function initColorPickers() {
+        const p1Picker = document.getElementById('p1-color-picker');
+        const p2Picker = document.getElementById('p2-color-picker');
+        p1Picker.innerHTML = '';
+        p2Picker.innerHTML = '';
+
+        COLOR_PALETTE.forEach((c, idx) => {
+            // P1 Swatch
+            const sw1 = document.createElement('div');
+            sw1.className = `color-swatch ${c.hex === players[1].color ? 'selected' : ''}`;
+            sw1.style.backgroundColor = c.hex;
+            sw1.onclick = () => {
+                players[1].color = c.hex;
+                document.querySelectorAll('#p1-color-picker .color-swatch').forEach(s => s.classList.remove('selected'));
+                sw1.classList.add('selected');
+            };
+            p1Picker.appendChild(sw1);
+
+            // P2 Swatch
+            const sw2 = document.createElement('div');
+            sw2.className = `color-swatch ${c.hex === players[2].color ? 'selected' : ''}`;
+            sw2.style.backgroundColor = c.hex;
+            sw2.onclick = () => {
+                players[2].color = c.hex;
+                document.querySelectorAll('#p2-color-picker .color-swatch').forEach(s => s.classList.remove('selected'));
+                sw2.classList.add('selected');
+            };
+            p2Picker.appendChild(sw2);
+        });
+    }
+
+    function setGameMode(mode) {
+        gameMode = mode;
+        const pvpBtn = document.getElementById('mode-pvp-btn');
+        const aiBtn = document.getElementById('mode-ai-btn');
+        const aiBox = document.getElementById('ai-difficulty-box');
+        const p2Label = document.getElementById('p2-label');
+        const p2Input = document.getElementById('p2-name-input');
+        const modeBadge = document.getElementById('mode-badge');
+
+        if (mode === 'pvp') {
+            pvpBtn.className = "py-2 px-3 rounded-xl border border-blue-500/80 bg-blue-900/30 text-white font-bold text-center";
+            aiBtn.className = "py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-400 font-bold text-center";
+            aiBox.classList.add('hidden');
+            p2Label.innerText = "Player 2";
+            if (p2Input.value.startsWith("AI Bot")) p2Input.value = "Player 2";
+            modeBadge.innerText = "PvP";
+        } else {
+            aiBtn.className = "py-2 px-3 rounded-xl border border-purple-500/80 bg-purple-900/30 text-white font-bold text-center";
+            pvpBtn.className = "py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-400 font-bold text-center";
+            aiBox.classList.remove('hidden');
+            p2Label.innerText = "AI Opponent";
+            p2Input.value = `AI Bot (${aiDifficulty.toUpperCase()})`;
+            modeBadge.innerText = `VS AI (${aiDifficulty.toUpperCase()})`;
+        }
+    }
+
+    function setAIDifficulty(diff) {
+        aiDifficulty = diff;
+        document.querySelectorAll('.ai-diff-btn').forEach(btn => {
+            if (btn.dataset.diff === diff) {
+                btn.className = "ai-diff-btn py-1.5 rounded-lg border border-amber-500/80 bg-amber-950/40 text-amber-300 font-semibold text-center";
+            } else {
+                btn.className = "ai-diff-btn py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-semibold text-center";
+            }
+        });
+        const p2Input = document.getElementById('p2-name-input');
+        if (gameMode === 'ai') {
+            p2Input.value = `AI Bot (${aiDifficulty.toUpperCase()})`;
+            document.getElementById('mode-badge').innerText = `VS AI (${aiDifficulty.toUpperCase()})`;
+        }
+    }
+
+    function renderSidebarScoreboard() {
+        const historyContainer = document.getElementById('history-list');
+        historyContainer.innerHTML = '';
+
+        rounds.forEach((r, idx) => {
+            const hData = roundHistory[idx];
+            const isCurrent = idx === currentRoundIndex;
+            const isPast = idx < currentRoundIndex;
+
+            const row = document.createElement('div');
+            row.className = `p-2 rounded-xl border ${
+                isCurrent 
+                ? 'bg-slate-800 border-amber-500/60' 
+                : isPast 
+                ? 'bg-slate-900/60 border-slate-800' 
+                : 'bg-slate-950/40 border-slate-800/40 opacity-50'
+            }`;
+
+            row.innerHTML = `
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold ${isCurrent ? 'text-amber-400' : 'text-slate-400'}">Round ${r.name}</span>
+                    <span class="text-[10px] text-slate-500">Receiver: P${r.receiver}</span>
+                </div>
+                <div class="flex justify-between text-[11px] font-mono">
+                    <span style="color: ${players[1].color}">${hData ? hData.p1.toFixed(3) : '-'}</span>
+                    <span style="color: ${players[2].color}">${hData ? hData.p2.toFixed(3) : '-'}</span>
+                </div>
+            `;
+            historyContainer.appendChild(row);
+        });
+
+        // Totals
+        document.getElementById('sb-p1-name').innerText = players[1].name;
+        document.getElementById('sb-p1-name').style.color = players[1].color;
+        document.getElementById('sb-p1-total').innerText = players[1].score.toFixed(3);
+
+        document.getElementById('sb-p2-name').innerText = players[2].name;
+        document.getElementById('sb-p2-name').style.color = players[2].color;
+        document.getElementById('sb-p2-total').innerText = players[2].score.toFixed(3);
+    }
+
+    // Window Resize & Responsive canvas dimensions setup
+    function resizeCanvas() {
+        const wrapper = document.getElementById('canvas-wrapper');
+        canvas.width = wrapper.clientWidth;
+        canvas.height = wrapper.clientHeight;
+        
+        ballRadius = Math.max(14, Math.min(22, canvas.width * 0.025));
+        
+        if (gameState === 'AIMING' || gameState === 'AI_THINKING') {
+            resetBallPosition();
+        }
+
+        if (gameState !== 'ROUND_END_ANIM' && baskets.length > 0) {
+            updateBasketPositions();
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function resetBallPosition() {
+        ballPos = { x: canvas.width / 2, y: canvas.height - 70 };
+    }
+
+    function updateBasketPositions() {
+        const spacing = canvas.width / (baskets.length + 1);
+        const radius = Math.max(28, Math.min(42, canvas.width / 16));
+
+        baskets.forEach((b, idx) => {
+            b.targetX = spacing * (idx + 1);
+            b.targetY = Math.min(canvas.height * 0.3, 190);
+            b.radius = radius;
+        });
+
+        // Maintain relative (rX, rY) positions when resizing without re-randomizing
+        if (gameState !== 'ROUND_END_ANIM') {
+            baskets.forEach(b => {
+                if (b.rX !== undefined && b.rY !== undefined) {
+                    b.x = b.rX * canvas.width;
+                    b.y = b.rY * canvas.height;
+                }
+            });
+        }
+    }
+
+    function initRound() {
+        mainBallsPool = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        mainBallsPool.sort(() => Math.random() - 0.5);
+
+        receiverExtraPool = [];
+        isExtraPhase = false;
+
+        let shuffledTypes = [...BASKET_TYPES].sort(() => Math.random() - 0.5);
+        baskets = shuffledTypes.map(bt => ({
+            ...bt,
+            x: 0,
+            y: 0,
+            rX: 0,
+            rY: 0,
+            targetX: 0,
+            targetY: 0,
+            radius: 32,
+            filled: false,
+            ballVal: null
+        }));
+
+        // Scatter baskets across 2D space once per round and record normalized (rX, rY) coordinates
+        const radius = Math.max(28, Math.min(42, canvas.width / 16));
+        const minX = radius + 30;
+        const maxX = canvas.width - radius - 30;
+        const minY = radius + 60;
+        const maxY = canvas.height * 0.62;
+        const minDist = radius * 2.5;
+
+        baskets.forEach(b => {
+            let attempts = 0;
+            let validPos = false;
+            while (!validPos && attempts < 200) {
+                attempts++;
+                const candidateX = minX + Math.random() * (maxX - minX);
+                const candidateY = minY + Math.random() * (maxY - minY);
+
+                validPos = baskets.every(other => {
+                    if (other === b || (other.x === 0 && other.y === 0)) return true;
+                    return Math.hypot(candidateX - other.x, candidateY - other.y) >= minDist;
+                });
+
+                if (validPos) {
+                    b.x = candidateX;
+                    b.y = candidateY;
+                }
+            }
+            if (!validPos) {
+                b.x = canvas.width * 0.5;
+                b.y = canvas.height * 0.3;
+            }
+            b.rX = b.x / canvas.width;
+            b.rY = b.y / canvas.height;
+        });
+
+        updateBasketPositions();
+        updateHeader();
+        renderSidebarScoreboard();
+        nextTurn();
+    }
+
+    function getCurrentReceiver() {
+        return rounds[currentRoundIndex].receiver;
+    }
+
+    function getCurrentNonReceiver() {
+        return getCurrentReceiver() === 1 ? 2 : 1;
+    }
+
+    function checkRoundFinished() {
+        const allFilled = baskets.every(b => b.filled);
+        if (allFilled) return true;
+        if (mainBallsPool.length === 0 && receiverExtraPool.length === 0) return true;
+        return false;
+    }
+
+    function nextTurn() {
+        if (checkRoundFinished()) {
+            startRoundEndSequence();
+            return;
+        }
+
+        const receiver = getCurrentReceiver();
+        const nonReceiver = getCurrentNonReceiver();
+
+        if (mainBallsPool.length > 0) {
+            isExtraPhase = false;
+            if (currentBallValue === null) {
+                currentThrower = nonReceiver;
+            } else {
+                currentThrower = (currentThrower === 1) ? 2 : 1;
+            }
+            currentBallValue = mainBallsPool.pop();
+        } else if (receiverExtraPool.length > 0) {
+            isExtraPhase = true;
+            currentThrower = receiver;
+            currentBallValue = receiverExtraPool.shift();
+        } else {
+            startRoundEndSequence();
+            return;
+        }
+
+        // Update UI Badges
+        const throwerBadge = document.getElementById('thrower-badge');
+        throwerBadge.innerText = `${players[currentThrower].name} ${isExtraPhase ? '(Extra)' : ''}`;
+        throwerBadge.style.backgroundColor = players[currentThrower].color;
+
+        document.getElementById('current-ball-val').innerText = currentBallValue;
+        document.getElementById('saved-misses-count').innerText = receiverExtraPool.length;
+
+        resetBallPosition();
+
+        if (gameMode === 'ai' && currentThrower === 2) {
+            gameState = 'AI_THINKING';
+            triggerAITurn();
+        } else {
+            gameState = 'AIMING';
+        }
+    }
+
+    function triggerAITurn() {
+        const receiver = getCurrentReceiver();
+        const isReceiver = (currentThrower === receiver);
+        const emptyBaskets = baskets.filter(b => !b.filled);
+
+        if (emptyBaskets.length === 0) return;
+
+        let targetBasket = null;
+
+        // AI Target Strategy
+        if (aiDifficulty === 'easy') {
+            // Pick random empty basket
+            targetBasket = emptyBaskets[Math.floor(Math.random() * emptyBaskets.length)];
+        } else if (aiDifficulty === 'medium') {
+            // 70% optimal choice
+            if (Math.random() < 0.7) {
+                emptyBaskets.sort((a, b) => isReceiver ? (b.val - a.val) : (a.val - b.val));
+                targetBasket = emptyBaskets[0];
+            } else {
+                targetBasket = emptyBaskets[Math.floor(Math.random() * emptyBaskets.length)];
+            }
+        } else { // Hard
+            // 100% optimal choice
+            emptyBaskets.sort((a, b) => isReceiver ? (b.val - a.val) : (a.val - b.val));
+            targetBasket = emptyBaskets[0];
+        }
+
+        // Calculate velocity required to reach targetBasket
+        const t = 34; // Steps to reach target
+        const gravity = 0.38;
+        const requiredVx = (targetBasket.x - ballPos.x) / t;
+        const requiredVy = (targetBasket.y - ballPos.y - 0.5 * gravity * t * t) / t;
+
+        // Apply error margin based on difficulty
+        let errorScale = 0;
+        if (aiDifficulty === 'easy') errorScale = 2.8;
+        else if (aiDifficulty === 'medium') errorScale = 1.2;
+        else errorScale = 0.3;
+
+        const finalVx = requiredVx + (Math.random() - 0.5) * errorScale;
+        const finalVy = requiredVy + (Math.random() - 0.5) * errorScale;
+
+        // Inverse calculation of refined drag curve for AI animation
+        const baseScale = Math.sqrt(canvas.height) * 0.42;
+        const speedRatioY = Math.min(1.0, Math.abs(finalVy) / (canvas.height * 0.038));
+        const pullDistY = Math.pow(speedRatioY, 1 / 0.75) * 160;
+        
+        const dragDx = finalVx < 0 ? 60 : -60;
+        const dragDy = pullDistY;
+
+        dragStart = { x: ballPos.x, y: ballPos.y };
+        let progress = 0;
+
+        const aiAimInterval = setInterval(() => {
+            progress += 0.1;
+            dragCurrent = {
+                x: ballPos.x + dragDx * progress,
+                y: ballPos.y + dragDy * progress
+            };
+
+            if (progress >= 1) {
+                clearInterval(aiAimInterval);
+                setTimeout(() => {
+                    ballVel = { x: finalVx, y: finalVy };
+                    dragStart = null;
+                    dragCurrent = null;
+                    gameState = 'FLYING';
+                }, 300);
+            }
+        }, 40);
+    }
+
+    function startGame() {
+        const p1Name = document.getElementById('p1-name-input').value.trim() || "Player 1";
+        const p2Name = document.getElementById('p2-name-input').value.trim() || (gameMode === 'ai' ? 'AI Bot' : 'Player 2');
+
+        players[1].name = p1Name;
+        players[2].name = p2Name;
+        players[1].score = 0;
+        players[2].score = 0;
+
+        currentRoundIndex = 0;
+        currentBallValue = null;
+        roundHistory = [];
+
+        document.getElementById('modal').style.display = 'none';
+        
+        resizeCanvas();
+        initRound();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function updateHeader() {
+        document.getElementById('p1-header-name').innerText = players[1].name;
+        document.getElementById('p1-score').innerText = players[1].score.toFixed(3);
+        document.getElementById('p1-score').style.color = players[1].color;
+        document.getElementById('p1-header-card').style.borderColor = players[1].color + '66';
+
+        document.getElementById('p2-header-name').innerText = players[2].name;
+        document.getElementById('p2-score').innerText = players[2].score.toFixed(3);
+        document.getElementById('p2-score').style.color = players[2].color;
+        document.getElementById('p2-header-card').style.borderColor = players[2].color + '66';
+
+        const r = rounds[currentRoundIndex];
+        document.getElementById('round-indicator').innerText = `Round ${r.name}`;
+        document.getElementById('receiver-indicator').innerText = `${players[r.receiver].name} collects score`;
+    }
+    // Compute launch velocity from drag vector using refined non-linear power curve
+    function calculateLaunchVelocity(dx, dy) {
+        const pullDist = Math.hypot(dx, dy);
+        if (pullDist < 12) return { x: 0, y: 0 };
+
+        // Scale factor relative to screen height for consistent feel across devices
+        const baseScale = Math.sqrt(canvas.height) * 0.42;
+        
+        // Dynamic velocity ceilings to keep ball smoothly on screen
+        const maxSpeedX = canvas.width * 0.032;
+        const maxSpeedY = canvas.height * 0.038;
+
+        // Non-linear power curve (Exponent 0.75):
+        // Small pulls -> high precision, small velocity changes
+        // Deep pulls -> smoothly reaches max capacity without exploding off-screen
+        const normalizedPullY = Math.min(1.0, Math.max(0, dy) / 160);
+        const powerFactorY = Math.pow(normalizedPullY, 0.75);
+        
+        // Vertical velocity calculation (upwards when dy is positive drag down)
+        let vy = - (powerFactorY * maxSpeedY + (dy > 0 ? 1.5 : 0));
+        if (dy < 0) vy = Math.abs(dy) * 0.08; // Backward push if pulled upward
+
+        // Horizontal velocity with smooth proportional responsiveness
+        const normalizedPullX = Math.max(-1.0, Math.min(1.0, dx / 150));
+        const powerFactorX = Math.sign(dx) * Math.pow(Math.abs(normalizedPullX), 0.85);
+        let vx = powerFactorX * maxSpeedX;
+
+        return { x: vx, y: vy };
+    }
+
+    function releasePointer(e) {
+        if (!dragStart || (e && e.pointerId !== activePointerId) || gameState !== 'AIMING') return;
+        
+        if (dragCurrent) {
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+            const distance = Math.hypot(dx, dy);
+            
+            if (distance > 12) {
+                const launchVel = calculateLaunchVelocity(dx, dy);
+                if (Math.abs(launchVel.y) > 0.5 || Math.abs(launchVel.x) > 0.5) {
+                    ballVel = launchVel;
+                    gameState = 'FLYING';
+                }
+            }
+        }
+
+        dragStart = null;
+        dragCurrent = null;
+        if (activePointerId !== null) {
+            try { canvas.releasePointerCapture(activePointerId); } catch(err){}
+            activePointerId = null;
+        }
+    }
+
+    canvas.addEventListener('pointerup', releasePointer);
+    canvas.addEventListener('pointercancel', releasePointer);
+
+    function handleMiss() {
+        const receiver = getCurrentReceiver();
+        const nonReceiver = getCurrentNonReceiver();
+
+        if (currentThrower === nonReceiver) {
+            receiverExtraPool.push(currentBallValue);
+            showFloatingToast(`${players[nonReceiver].name} missed! Saved for ${players[receiver].name}`);
+        } else {
+            showFloatingToast(`${players[receiver].name} missed! Ball discarded.`);
+        }
+    }
+
+    let toastTimer = null;
+    let toastMessage = "";
+    function showFloatingToast(msg) {
+        toastMessage = msg;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+            toastMessage = "";
+        }, 1800);
+    }
+
+    function updatePhysics() {
+        if (gameState === 'FLYING') {
+            ballPos.x += ballVel.x;
+            ballPos.y += ballVel.y;
+            ballVel.y += 0.38; // Gravity effect
+
+            let basketHit = false;
+
+            // Collision check: INACTIVE (FILLED) BASKETS ARE Completely IGNORED!
+            // Flying balls pass right through filled baskets to hit empty ones behind.
+            for (let b of baskets) {
+                if (b.filled) continue; // Feature 1: Pass-through inactive baskets!
+
+                const dist = Math.hypot(ballPos.x - b.x, ballPos.y - b.y);
+                if (dist < b.radius * 1.35 && ballVel.y > -5) {
+                    basketHit = true;
+                    b.filled = true;
+                    b.ballVal = currentBallValue;
+                    showFloatingToast(`Landed in ${b.label}!`);
+                    break;
+                }
+            }
+
+            if (basketHit) {
+                gameState = 'WAITING';
+                setTimeout(nextTurn, 500);
+                return;
+            }
+
+            // Out of bounds check
+            if (ballPos.y > canvas.height + 40 || ballPos.x < -30 || ballPos.x > canvas.width + 30 || ballPos.y < -50) {
+                handleMiss();
+                gameState = 'WAITING';
+                setTimeout(nextTurn, 500);
+            }
+        }
+    }
+
+    function startRoundEndSequence() {
+        gameState = 'ROUND_END_ANIM';
+        animProgress = 0;
+
+        baskets.forEach(b => {
+            if (!b.filled) {
+                b.filled = true;
+                b.ballVal = 0;
+            }
+        });
+
+        roundCalculatedSum = 0;
+        roundCalcBreakdown = [];
+
+        const sortedTypes = [...BASKET_TYPES];
+        const spacing = canvas.width / (sortedTypes.length + 1);
+        const yPos = Math.min(canvas.height * 0.32, 200);
+
+        animStartBaskets = baskets.map(b => ({ ...b }));
+        
+        animTargetBaskets = sortedTypes.map((type, newIdx) => {
+            const originalBasket = baskets.find(b => b.val === type.val);
+            return {
+                ...originalBasket,
+                targetX: spacing * (newIdx + 1),
+                targetY: yPos
+            };
+        });
+
+        animTargetBaskets.forEach(b => {
+            const termVal = b.ballVal * b.val;
+            roundCalculatedSum += termVal;
+            roundCalcBreakdown.push({
+                label: b.label,
+                val: b.val,
+                digit: b.ballVal,
+                term: termVal
+            });
+        });
+    }
+
+    function updateRoundAnimation() {
+        if (gameState !== 'ROUND_END_ANIM') return;
+
+        animProgress += 0.018;
+
+        if (animProgress >= 1) {
+            animProgress = 1;
+            gameState = 'ROUND_CALC_MODAL';
+            showRoundSummaryModal();
+            return;
+        }
+
+        const t = animProgress < 0.5 
+            ? 2 * animProgress * animProgress 
+            : -1 + (4 - 2 * animProgress) * animProgress;
+
+        animTargetBaskets.forEach((tb) => {
+            const sb = animStartBaskets.find(b => b.val === tb.val);
+            tb.x = sb.x + (tb.targetX - sb.x) * t;
+            tb.y = sb.y + (tb.targetY - sb.y) * t;
+        });
+    }
+
+    function showRoundSummaryModal() {
+        const receiver = getCurrentReceiver();
+        players[receiver].score += roundCalculatedSum;
+
+        // Record history for sidebar
+        roundHistory[currentRoundIndex] = {
+            p1: receiver === 1 ? roundCalculatedSum : 0,
+            p2: receiver === 2 ? roundCalculatedSum : 0
+        };
+
+        updateHeader();
+        renderSidebarScoreboard();
+
+        let equationHTML = roundCalcBreakdown.map(item => 
+            `<span class="inline-block bg-slate-800 px-2 py-1 rounded text-xs border border-slate-700 m-0.5">
+                ${item.digit} &times; ${item.val} = <strong>${item.term.toFixed(3)}</strong>
+            </span>`
+        ).join(" + ");
+
+        const formattedNumber = roundCalculatedSum.toFixed(3);
+
+        const modal = document.getElementById('modal');
+        const content = document.getElementById('modal-content');
+
+        content.innerHTML = `
+            <div class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-1">Round ${rounds[currentRoundIndex].name} Complete</div>
+            <h2 class="text-2xl font-extrabold text-white mb-2" style="color:${players[receiver].color}">${players[receiver].name} Earns +${formattedNumber} Points!</h2>
+            
+            <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 my-4 text-left">
+                <div class="text-xs text-slate-400 font-semibold mb-1">Expanded Notation Breakdown:</div>
+                <div class="flex flex-wrap items-center justify-center text-slate-300 font-mono text-xs my-2">
+                    ${equationHTML}
+                </div>
+                <div class="text-center pt-2 border-t border-slate-800/80 text-emerald-400 font-black text-lg">
+                    Total: ${formattedNumber}
+                </div>
+            </div>
+
+            <button class="btn-action w-full py-3 px-6 text-white font-bold text-base rounded-xl" onclick="advanceToNextRound()">
+                ${currentRoundIndex < rounds.length - 1 ? 'Next Round →' : 'View Final Scores'}
+            </button>
+        `;
+
+        modal.style.display = 'flex';
+    }
+
+    function advanceToNextRound() {
+        document.getElementById('modal').style.display = 'none';
+        currentRoundIndex++;
+        currentBallValue = null;
+
+        if (currentRoundIndex >= rounds.length) {
+            showGameOverModal();
+        } else {
+            initRound();
+        }
+    }
+
+    function showGameOverModal() {
+        gameState = 'GAME_OVER';
+        let winnerText = "";
+        let winnerColor = "";
+        if (players[1].score > players[2].score) {
+            winnerText = `${players[1].name} Wins!`;
+            winnerColor = `color: ${players[1].color}`;
+        } else if (players[2].score > players[1].score) {
+            winnerText = `${players[2].name} Wins!`;
+            winnerColor = `color: ${players[2].color}`;
+        } else {
+            winnerText = "It's a Tie!";
+            winnerColor = "color: #f59e0b";
+        }
+
+        const modal = document.getElementById('modal');
+        const content = document.getElementById('modal-content');
+
+        content.innerHTML = `
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Final Result</div>
+            <h2 class="text-3xl font-black mb-4" style="${winnerColor}">${winnerText}</h2>
+            
+            <div class="bg-slate-950 rounded-2xl border border-slate-800 p-4 mb-6">
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/50">
+                        <span class="text-xs block font-semibold truncate" style="color: ${players[1].color}">${players[1].name}</span>
+                        <span class="text-xl font-black text-white">${players[1].score.toFixed(3)}</span>
+                    </div>
+                    <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/50">
+                        <span class="text-xs block font-semibold truncate" style="color: ${players[2].color}">${players[2].name}</span>
+                        <span class="text-xl font-black text-white">${players[2].score.toFixed(3)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-action w-full py-3.5 px-6 text-white font-bold text-lg rounded-2xl" onclick="openStartModal()">Play Again</button>
+        `;
+        modal.style.display = 'flex';
+    }
+
+    function openStartModal() {
+        const modal = document.getElementById('modal');
+        const content = document.getElementById('modal-content');
+
+        content.innerHTML = `
+            <h1 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-amber-300 to-purple-400 mb-1">Ping Pong Place Value</h1>
+            <p class="text-slate-400 text-xs mb-4">Master place value values in a tactical 3-round toss challenge!</p>
+            
+            <div id="setup-form" class="space-y-4 text-left text-xs mb-4">
+                <div>
+                    <label class="block font-bold text-slate-300 mb-1">Game Mode</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="mode-pvp-btn" class="py-2 px-3 rounded-xl border border-blue-500/80 bg-blue-900/30 text-white font-bold text-center" onclick="setGameMode('pvp')">Player vs Player</button>
+                        <button type="button" id="mode-ai-btn" class="py-2 px-3 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-400 font-bold text-center" onclick="setGameMode('ai')">Player vs AI</button>
+                    </div>
+                </div>
+
+                <div id="ai-difficulty-box" class="hidden">
+                    <label class="block font-bold text-slate-300 mb-1">AI Difficulty</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-semibold text-center" data-diff="easy" onclick="setAIDifficulty('easy')">Easy</button>
+                        <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-amber-500/80 bg-amber-950/40 text-amber-300 font-semibold text-center" data-diff="medium" onclick="setAIDifficulty('medium')">Medium</button>
+                        <button type="button" class="ai-diff-btn py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-semibold text-center" data-diff="hard" onclick="setAIDifficulty('hard')">Hard</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                        <label class="block font-bold text-blue-400">Player 1</label>
+                        <input type="text" id="p1-name-input" value="${players[1].name}" maxlength="12" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-medium focus:outline-none focus:border-blue-500">
+                        <div>
+                            <span class="block text-[10px] text-slate-400 mb-1">Color</span>
+                            <div class="flex space-x-1.5" id="p1-color-picker"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                        <label id="p2-label" class="block font-bold text-purple-400">Player 2</label>
+                        <input type="text" id="p2-name-input" value="${players[2].name}" maxlength="12" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-white font-medium focus:outline-none focus:border-purple-500">
+                        <div>
+                            <span class="block text-[10px] text-slate-400 mb-1">Color</span>
+                            <div class="flex space-x-1.5" id="p2-color-picker"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-action w-full py-3 px-6 text-white font-bold text-base rounded-2xl" onclick="startGame()">Start Game</button>
+        `;
+        initColorPickers();
+        setGameMode(gameMode);
+        modal.style.display = 'flex';
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const currentBasketsList = (gameState === 'ROUND_END_ANIM' || gameState === 'ROUND_CALC_MODAL') 
+            ? animTargetBaskets 
+            : baskets;
+
+        // Render Baskets
+        currentBasketsList.forEach(b => {
+            // Shadow
+            ctx.beginPath();
+            ctx.ellipse(b.x, b.y + b.radius * 0.7, b.radius, b.radius * 0.4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = b.filled ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.35)';
+            ctx.fill();
+
+            // Basket Body (Semi-transparent / Dimmed if filled)
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+            ctx.fillStyle = b.filled ? '#33415533' : b.color + '22';
+            ctx.fill();
+            ctx.lineWidth = b.filled ? 2 : 4;
+            ctx.strokeStyle = b.filled ? '#475569' : b.color;
+            ctx.stroke();
+
+            // Label Header
+            ctx.fillStyle = b.filled ? '#64748b' : '#f8fafc';
+            ctx.font = `bold ${Math.max(10, Math.min(13, b.radius * 0.4))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(b.label, b.x, b.y - b.radius - 12);
+            
+            ctx.fillStyle = b.filled ? '#64748b' : b.color;
+            ctx.font = `bold ${Math.max(9, Math.min(11, b.radius * 0.35))}px sans-serif`;
+            ctx.fillText(`(${b.val})`, b.x, b.y - b.radius - 2);
+
+            // Ball landed inside basket
+            if (b.filled) {
+                const insideRadius = b.radius * 0.55;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, insideRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#f8fafc';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#0f172a';
+                ctx.stroke();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.font = `black ${Math.max(12, Math.min(16, insideRadius))}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(b.ballVal, b.x, b.y + 1);
+                ctx.textBaseline = 'alphabetic';
+            }
+        });
+
+        // Decimal Point Indicator during animation
+        if (gameState === 'ROUND_END_ANIM' || gameState === 'ROUND_CALC_MODAL') {
+            const onesBasket = animTargetBaskets.find(b => b.val === 1);
+            const tenthsBasket = animTargetBaskets.find(b => b.val === 0.1);
+            if (onesBasket && tenthsBasket) {
+                const decX = (onesBasket.x + tenthsBasket.x) / 2;
+                const decY = onesBasket.y + 4;
+                ctx.beginPath();
+                ctx.arc(decX, decY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#f59e0b';
+                ctx.fill();
+                ctx.fillStyle = '#f59e0b';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('.', decX, decY - 8);
+            }
+        }
+
+        // Draw Aim Trajectory & Slingshot Elastic Line
+        if ((gameState === 'AIMING' || gameState === 'AI_THINKING') && dragStart && dragCurrent) {
+            const dx = dragStart.x - dragCurrent.x;
+            const dy = dragStart.y - dragCurrent.y;
+
+            const simVel = calculateLaunchVelocity(dx, dy);
+
+            ctx.beginPath();
+            let simX = ballPos.x;
+            let simY = ballPos.y;
+            let simVx = simVel.x;
+            let simVy = simVel.y;
+
+            for (let i = 0; i < 22; i++) {
+                simX += simVx;
+                simY += simVy;
+                simVy += 0.38; // Match gravity
+                
+                ctx.moveTo(simX + 3, simY);
+                ctx.arc(simX, simY, Math.max(1, 3.5 - i * 0.14), 0, Math.PI * 2);
+            }
+            ctx.fillStyle = players[currentThrower].color + 'dd';
+            ctx.fill();
+
+            // Pull Band Anchor Line
+        ctx.beginPath();
+        ctx.moveTo(ballPos.x, ballPos.y);
+        ctx.lineTo(dragCurrent.x, dragCurrent.y);
+        ctx.strokeStyle = players[currentThrower].color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    // Active Ball Drawing
+    if (gameState === 'AIMING' || gameState === 'FLYING' || gameState === 'AI_THINKING') {
+        ctx.beginPath();
+        ctx.arc(ballPos.x, ballPos.y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = players[currentThrower].color;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `black ${Math.max(12, Math.min(18, ballRadius * 0.9))}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(currentBallValue !== null ? currentBallValue : '?', ballPos.x, ballPos.y + 1);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // Toast Floating Messages
+    if (toastMessage) {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(canvas.width / 2 - 160, canvas.height * 0.72, 320, 36);
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(canvas.width / 2 - 160, canvas.height * 0.72, 320, 36);
+        
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(toastMessage, canvas.width / 2, canvas.height * 0.72 + 22);
+    }
+}
+
+function gameLoop() {
+    updatePhysics();
+    updateRoundAnimation();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Global Pointer Listeners for Touch, Chromebook trackpad & Mouse aiming
+canvas.addEventListener('pointerdown', (e) => {
+    if (gameState !== 'AIMING' || (gameMode === 'ai' && currentThrower === 2)) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (Math.hypot(x - ballPos.x, y - ballPos.y) < ballRadius * 3.5 || y > canvas.height - 140) {
+        dragStart = { x: ballPos.x, y: ballPos.y };
+        dragCurrent = { x, y };
+        activePointerId = e.pointerId;
+        try { canvas.setPointerCapture(e.pointerId); } catch(err) {}
+    }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+    if (!dragStart || e.pointerId !== activePointerId || gameState !== 'AIMING') return;
+    const rect = canvas.getBoundingClientRect();
+    dragCurrent = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+});
+
+window.onload = function() {
+    initColorPickers();
+    setGameMode('pvp');
+    document.getElementById('modal').style.display = 'flex';
+};
+</script>
+
+</body>
+</html>
